@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Order Status | Sakhaau MV · Satoshi MV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Copy / adjust to same CSS link as other pages -->
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="services.html">Products</a>
+      <a href="b2b.html">B2B</a>
+      <a href="b2c.html">B2C</a>
+      <a href="order.html">Order</a>
+      <a href="faq.html">FAQ</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <h1>Order Status &amp; Voucher Retrieval</h1>
+      <p>
+        Enter your <strong>Payment Reference</strong> and the
+        <strong>PIN you set on the Order page</strong>. Once we have
+        verified your payment and processed the order in our Google Sheet,
+        this page will show your gift voucher and invoice link.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Check your order</h2>
+
+      <form id="status-form">
+        <div class="form-row">
+          <label for="paymentRef">Payment Reference Number</label>
+          <input
+            id="paymentRef"
+            name="paymentRef"
+            type="text"
+            required
+            autocomplete="off"
+            placeholder="e.g. 1234567890"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="amount">
+            Payment Amount (optional but helps us match faster)
+          </label>
+          <input
+            id="amount"
+            name="amount"
+            type="number"
+            step="0.01"
+            autocomplete="off"
+            placeholder="e.g. 500"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="pin">PIN (set on the Order page)</label>
+          <input
+            id="pin"
+            name="pin"
+            type="password"
+            minlength="4"
+            maxlength="8"
+            required
+            autocomplete="off"
+            placeholder="Your secret PIN"
+          />
+        </div>
+
+        <button type="submit" class="primary-btn">
+          Check Order Status
+        </button>
+      </form>
+
+      <div id="status-message" class="status-message"></div>
+
+      <div id="voucher-result" class="card" style="display:none; margin-top:1.5rem;">
+        <h3>Voucher Details</h3>
+        <p><strong>Product:</strong> <span id="voucher-product"></span></p>
+        <p><strong>Voucher Code:</strong> <span id="voucher-code"></span></p>
+        <p>
+          <strong>Invoice:</strong>
+          <a id="invoice-link" href="#" target="_blank" rel="noopener">
+            Open invoice
+          </a>
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© Sakhaau MV / Satoshi MV</p>
+    <p>
+      <a href="legal/terms.html">Terms &amp; Conditions</a> ·
+      <a href="legal/site-terms.html">Website Terms</a> ·
+      <a href="legal/privacy.html">Privacy</a> ·
+      <a href="legal/aml.html">AML Policy</a> ·
+      <a href="legal/sharia.html">Sharia Compliance</a>
+    </p>
+  </footer>
+
+  <script>
+    // ====== CONFIG ======
+    // Live JSON view of your "orders" sheet
+    const SHEET_JSON_URL =
+      "https://docs.google.com/spreadsheets/d/1-tJh3hUq-RPs7v_6iCx0qsbYNqQCDw_LpedEIGf64F8/gviz/tq?tqx=out:json&sheet=orders";
+
+    // Column indexes in the "orders" tab:
+    // A: PaymentRef | B: Amount | C: Product | D: Status
+    // E: CustomerPIN | F: VoucherCode | G: InvoiceURL
+    const COL_PAYMENT_REF = 0;
+    const COL_AMOUNT = 1;
+    const COL_PRODUCT = 2;
+    const COL_STATUS = 3;
+    const COL_CUSTOMER_PIN = 4;
+    const COL_VOUCHER_CODE = 5;
+    const COL_INVOICE_URL = 6;
+
+    const form = document.getElementById("status-form");
+    const statusMessage = document.getElementById("status-message");
+    const voucherCard = document.getElementById("voucher-result");
+    const voucherProduct = document.getElementById("voucher-product");
+    const voucherCode = document.getElementById("voucher-code");
+    const invoiceLink = document.getElementById("invoice-link");
+
+    async function fetchSheetRows() {
+      const res = await fetch(SHEET_JSON_URL, { cache: "no-store" });
+      if (!res.ok) {
+        throw new Error("Failed to reach order database. Try again later.");
+      }
+      const text = await res.text();
+
+      // gviz returns: google.visualization.Query.setResponse({...});
+      const jsonStr = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+      const data = JSON.parse(jsonStr);
+
+      const rows = data.table.rows || [];
+      // Convert to simple arrays of string values
+      return rows.map((row) =>
+        row.c.map((cell) => (cell && cell.v != null ? String(cell.v) : ""))
+      );
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      voucherCard.style.display = "none";
+      statusMessage.textContent = "Checking your order…";
+
+      const refInput = form.paymentRef.value.trim();
+      const amountInput = form.amount.value.trim();
+      const pinInput = form.pin.value.trim();
+
+      if (!refInput || !pinInput) {
+        statusMessage.textContent =
+          "Please enter both your Payment Reference and your PIN.";
+        return;
+      }
+
+      try {
+        const rows = await fetchSheetRows();
+
+        // Find row matching PaymentRef + PIN (+ optional Amount)
+        const match = rows.find((row) => {
+          const rowRef = (row[COL_PAYMENT_REF] || "").trim();
+          const rowPin = (row[COL_CUSTOMER_PIN] || "").trim();
+
+          if (rowRef !== refInput || rowPin !== pinInput) return false;
+
+          if (amountInput) {
+            const rowAmount = (row[COL_AMOUNT] || "").trim();
+            return rowAmount === amountInput;
+          }
+          return true;
+        });
+
+        if (!match) {
+          statusMessage.textContent =
+            "No matching order found. Please check your Payment Reference and PIN.";
+          return;
+        }
+
+        const status = (match[COL_STATUS] || "").toLowerCase();
+        const product = match[COL_PRODUCT] || "";
+        const code = match[COL_VOUCHER_CODE] || "";
+        const invoiceUrl = match[COL_INVOICE_URL] || "";
+
+        if (status !== "processed") {
+          statusMessage.textContent =
+            "We have your order, but it is not yet processed. Please try again later during business hours.";
+          return;
+        }
+
+        if (!code) {
+          statusMessage.textContent =
+            "Order is marked as processed, but voucher code is missing. Please contact support.";
+          return;
+        }
+
+        voucherProduct.textContent = product;
+        voucherCode.textContent = code;
+
+        if (invoiceUrl) {
+          invoiceLink.href = invoiceUrl;
+          invoiceLink.style.display = "inline";
+        } else {
+          invoiceLink.style.display = "none";
+        }
+
+        voucherCard.style.display = "block";
+        statusMessage.textContent =
+          "Order found and processed. Your voucher details are shown below.";
+      } catch (err) {
+        console.error(err);
+        statusMessage.textContent =
+          "There was a problem checking your order. Please try again later.";
+      }
+    });
+  </script>
+</body>
+</html>
