@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Place Order | Sakhaau MV · Satoshi MV</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- If your main CSS file has a different name/path, copy the link tag from index.html -->
+  <link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+  <!-- Top nav – adjust to exactly match your existing markup if needed -->
+  <header class="site-header">
+    <nav class="site-nav">
+      <a href="index.html">Home</a>
+      <a href="about.html">About</a>
+      <a href="services.html">Products</a>
+      <a href="b2b.html">B2B</a>
+      <a href="b2c.html">B2C</a>
+      <a href="faq.html">FAQ</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="hero">
+      <h1>Payment &amp; Order Request</h1>
+      <p>
+        Use this page after you have transferred funds to our bank account.
+        Your <strong>Payment Reference Number</strong> and the
+        <strong>PIN you set here</strong> will be used later on the
+        <a href="order-status.html">Order Status page</a> to access your gift
+        voucher once it is processed.
+      </p>
+    </section>
+
+    <!-- STEP 1: Payment instructions -->
+    <section class="card">
+      <h2>Step 1 — Transfer the funds</h2>
+      <p>Transfer the exact amount to the account shown below.</p>
+
+      <!-- Update these details to your actual account(s) -->
+      <ul>
+        <li><strong>Bank:</strong> [Your bank name]</li>
+        <li><strong>Account Name:</strong> Sakhaau</li>
+        <li><strong>Account Number:</strong> [Your account number]</li>
+        <li><strong>Reference / Remarks:</strong> Any text is fine. After payment,
+          your bank or deposit slip will show a <strong>Payment Reference Number</strong>.
+        </li>
+      </ul>
+
+      <p>
+        Keep the <strong>Payment Reference Number</strong> (or cash deposit slip
+        number). This is how we match your order regardless of which bank or
+        method you used (cash deposit, online transfer, etc.).
+      </p>
+    </section>
+
+    <!-- STEP 2: Collect order details + PIN, then send to WhatsApp -->
+    <section class="card">
+      <h2>Step 2 — Submit your order details</h2>
+      <p>
+        Fill this form after payment. We will receive it as a WhatsApp message,
+        then we’ll verify and enter it into our Google Sheet. Once processed,
+        you can unlock your code on the
+        <a href="order-status.html">Order Status page</a>
+        using your Payment Ref + PIN.
+      </p>
+
+      <form id="order-form">
+        <div class="form-row">
+          <label for="paymentRef">Payment Reference Number</label>
+          <input
+            id="paymentRef"
+            name="paymentRef"
+            type="text"
+            required
+            autocomplete="off"
+            placeholder="e.g. 1234567890"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="amount">Amount Paid (MVR / USD)</label>
+          <input
+            id="amount"
+            name="amount"
+            type="number"
+            step="0.01"
+            required
+            placeholder="e.g. 500"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="product">Gift Card / Voucher Requested</label>
+          <input
+            id="product"
+            name="product"
+            type="text"
+            required
+            placeholder="e.g. Amazon $100"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="contact">Your Contact (Telegram / WhatsApp / Email)</label>
+          <input
+            id="contact"
+            name="contact"
+            type="text"
+            required
+            placeholder="e.g. @username or +9607xxxxxx or email"
+          />
+        </div>
+
+        <div class="form-row">
+          <label for="pin">
+            Set a 4–8 digit PIN
+            <small>(you will need this later on the Order Status page)</small>
+          </label>
+          <input
+            id="pin"
+            name="pin"
+            type="password"
+            minlength="4"
+            maxlength="8"
+            required
+            autocomplete="new-password"
+            placeholder="Choose a secret PIN"
+          />
+        </div>
+
+        <p class="small">
+          Do <strong>not</strong> reuse a PIN from your bank or any other
+          financial service.
+        </p>
+
+        <button type="submit" class="primary-btn">
+          Place Order Request via WhatsApp
+        </button>
+      </form>
+
+      <p class="small" id="order-help"></p>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© Sakhaau MV / Satoshi MV</p>
+    <p>
+      <a href="legal/terms.html">Terms &amp; Conditions</a> ·
+      <a href="legal/site-terms.html">Website Terms</a> ·
+      <a href="legal/privacy.html">Privacy</a> ·
+      <a href="legal/aml.html">AML Policy</a> ·
+      <a href="legal/sharia.html">Sharia Compliance</a>
+    </p>
+  </footer>
+
+  <script>
+    // WhatsApp number for order notifications (country code + number, no + sign)
+    const WHATSAPP_NUMBER = "9607507509"; // adjust if needed
+
+    const form = document.getElementById("order-form");
+    const help = document.getElementById("order-help");
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+
+      const paymentRef = form.paymentRef.value.trim();
+      const amount = form.amount.value.trim();
+      const product = form.product.value.trim();
+      const contact = form.contact.value.trim();
+      const pin = form.pin.value.trim();
+
+      if (!paymentRef || !amount || !product || !contact || !pin) {
+        help.textContent = "Please fill in all fields before submitting.";
+        return;
+      }
+
+      const message = [
+        "SatoshiMV Gift Card Order",
+        "",
+        "Payment Reference: " + paymentRef,
+        "Amount Paid: " + amount,
+        "Product: " + product,
+        "Customer Contact: " + contact,
+        "Customer PIN (for status page): " + pin,
+        "",
+        "I confirm that I have transferred the funds."
+      ].join("\n");
+
+      const encoded = encodeURIComponent(message);
+      const url = "https://wa.me/" + WHATSAPP_NUMBER + "?text=" + encoded;
+
+      window.location.href = url;
+
+      help.textContent =
+        "Opening WhatsApp… if it does not open, you can manually send us this message with your payment ref and PIN.";
+    });
+  </script>
+</body>
+</html>
